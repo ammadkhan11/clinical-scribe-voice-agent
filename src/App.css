@@ -1,0 +1,516 @@
+:root {
+  color: #16313c;
+  background: #f7fbfb;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(83, 188, 192, 0.18), transparent 34rem),
+    linear-gradient(180deg, #fbfefd 0%, #eef7f8 100%);
+}
+
+button {
+  border: 0;
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(20, 154, 166, 0.35);
+  outline-offset: 3px;
+}
+
+.app-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #12303b;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  background: #117f8b;
+  color: white;
+  font-size: 0.95rem;
+  letter-spacing: 0;
+}
+
+.phase-badge {
+  border: 1px solid #bfe6e7;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0d6e78;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+main {
+  display: grid;
+  gap: 28px;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 28px;
+  align-items: stretch;
+}
+
+.hero {
+  min-height: 520px;
+  align-items: center;
+  padding: 46px 0 24px;
+}
+
+.hero-copy {
+  align-self: center;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: #107785;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  max-width: 760px;
+  margin-bottom: 18px;
+  color: #102f3a;
+  font-size: clamp(2.45rem, 6vw, 5.25rem);
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+h2 {
+  margin-bottom: 12px;
+  color: #143641;
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+h3 {
+  margin-bottom: 10px;
+  color: #183945;
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.hero-subtitle,
+.demo-section p,
+.workflow-card p {
+  color: #516873;
+  font-size: 1.02rem;
+}
+
+.hero-subtitle {
+  max-width: 640px;
+  font-size: 1.25rem;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 30px 0 18px;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 48px;
+  border-radius: 14px;
+  padding: 0 20px;
+  cursor: pointer;
+  font-weight: 800;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.primary-button {
+  background: #0f8794;
+  color: white;
+  box-shadow: 0 16px 30px rgba(15, 135, 148, 0.24);
+}
+
+.secondary-button {
+  border: 1px solid #bfdfe1;
+  background: #ffffff;
+  color: #16404b;
+}
+
+.primary-button:hover:not(:disabled),
+.secondary-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.status-strip,
+.call-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-strip {
+  width: fit-content;
+  border: 1px solid #d6ebed;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #294c57;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9aaab0;
+}
+
+.status-dot.active {
+  background: #20a779;
+  box-shadow: 0 0 0 7px rgba(32, 167, 121, 0.12);
+}
+
+.error-banner {
+  max-width: 720px;
+  margin-top: 16px;
+  border: 1px solid #fac6c6;
+  border-radius: 14px;
+  background: #fff7f7;
+  color: #a13333;
+  padding: 14px 16px;
+  font-weight: 700;
+}
+
+.safety-card,
+.transcript-card,
+.workflow-card,
+.demo-section blockquote,
+.roadmap-section {
+  border: 1px solid rgba(184, 221, 224, 0.8);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 60px rgba(29, 82, 96, 0.09);
+}
+
+.safety-card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 20px;
+}
+
+.safety-card p {
+  margin: 0;
+  color: #3e5a64;
+  font-weight: 700;
+}
+
+.safety-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff3cf;
+  color: #8a620b;
+  font-weight: 900;
+}
+
+.workflow-section,
+.demo-section,
+.roadmap-section {
+  padding: 44px 0;
+}
+
+.transcript-card {
+  padding: 22px;
+}
+
+.hero-call-card {
+  align-self: center;
+  min-width: 0;
+}
+
+.hero-call-card h2 {
+  margin-bottom: 18px;
+  font-size: clamp(1.55rem, 2.4vw, 2.05rem);
+}
+
+.mic-orb {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border-radius: 18px;
+  background: #e9f4f5;
+}
+
+.mic-orb span {
+  width: 18px;
+  height: 26px;
+  border-radius: 999px;
+  background: #6f8790;
+}
+
+.mic-orb.listening {
+  background: #dff8ef;
+  box-shadow: 0 0 0 8px rgba(32, 167, 121, 0.1);
+}
+
+.mic-orb.listening span {
+  background: #20a779;
+}
+
+.state-label {
+  margin: 0;
+  color: #6a8189;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.call-state strong {
+  display: block;
+  color: #153540;
+  font-size: 1.2rem;
+}
+
+.transcript-box {
+  max-height: 300px;
+  min-height: 300px;
+  margin-top: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #d6e9eb;
+  border-radius: 16px;
+  background: #f8fdfd;
+  padding: 16px;
+}
+
+.empty-transcript {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  margin: 0;
+  color: #78909a;
+  text-align: center;
+}
+
+.transcript-message {
+  max-width: 88%;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  padding: 12px 14px;
+  overflow-wrap: anywhere;
+}
+
+.transcript-message span {
+  display: block;
+  margin-bottom: 4px;
+  color: inherit;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.transcript-message p {
+  margin: 0;
+}
+
+.transcript-message.user {
+  margin-left: auto;
+  background: #0f8794;
+  color: white;
+}
+
+.transcript-message.assistant {
+  margin-right: auto;
+  background: #e6f4f5;
+  color: #244a56;
+}
+
+.section-heading {
+  max-width: 760px;
+  margin-bottom: 22px;
+}
+
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.workflow-card {
+  padding: 20px;
+}
+
+.workflow-card span {
+  display: inline-block;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: #e3f8f9;
+  color: #0f7884;
+  font-size: 0.8rem;
+  font-weight: 900;
+  padding: 6px 10px;
+}
+
+.demo-section blockquote {
+  margin: 0;
+  color: #234751;
+  font-size: 1.15rem;
+  font-weight: 700;
+  padding: 28px;
+}
+
+.roadmap-section {
+  padding: 34px;
+}
+
+.roadmap-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.roadmap-item {
+  display: flex;
+  min-height: 98px;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid #d9ecee;
+  border-radius: 16px;
+  background: #f8fcfc;
+  padding: 16px;
+}
+
+.roadmap-item span {
+  width: 26px;
+  height: 4px;
+  border-radius: 999px;
+  background: #54bec5;
+}
+
+.roadmap-item p {
+  margin: 18px 0 0;
+  color: #365a64;
+  font-weight: 800;
+}
+
+footer {
+  padding: 36px 0 44px;
+  color: #5b747d;
+  text-align: center;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .section-grid,
+  .workflow-grid,
+  .roadmap-list {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    min-height: auto;
+    padding-top: 24px;
+  }
+
+  .roadmap-list {
+    gap: 10px;
+  }
+
+  .roadmap-item {
+    min-height: 76px;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    width: min(100% - 20px, 1180px);
+  }
+
+  .navbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .primary-button,
+  .secondary-button {
+    width: 100%;
+  }
+
+  .safety-card {
+    flex-direction: column;
+  }
+
+  .transcript-card,
+  .demo-section blockquote,
+  .roadmap-section {
+    padding: 20px;
+  }
+}
