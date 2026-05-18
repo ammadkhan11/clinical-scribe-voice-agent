@@ -43,6 +43,7 @@ const MERGE_WINDOW_MS = 15000;
 function App() {
   const vapiRef = useRef(null);
   const transcriptSectionRef = useRef(null);
+  const transcriptBoxRef = useRef(null);
   const [status, setStatus] = useState("Idle");
   const [isCallActive, setIsCallActive] = useState(false);
   const [transcript, setTranscript] = useState([]);
@@ -188,6 +189,17 @@ function App() {
     };
   }, [missingConfig]);
 
+  useEffect(() => {
+    if (!transcriptBoxRef.current) return;
+
+    requestAnimationFrame(() => {
+      if (!transcriptBoxRef.current) return;
+
+      transcriptBoxRef.current.scrollTop =
+        transcriptBoxRef.current.scrollHeight;
+    });
+  }, [transcript]);
+
   const scrollToTranscriptOnce = () => {
     setTimeout(() => {
       const target =
@@ -297,7 +309,7 @@ function App() {
               </div>
             </div>
 
-            <div className="transcript-box" aria-live="polite">
+            <div className="transcript-box" aria-live="polite" ref={transcriptBoxRef}>
               {transcript.length === 0 ? (
                 <p className="empty-transcript">Transcript will appear here during the call.</p>
               ) : (
