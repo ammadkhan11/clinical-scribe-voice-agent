@@ -82,35 +82,38 @@ function App() {
 
       if (message?.type !== "transcript") return;
 
-      const transcriptType =
-        message.transcriptType ||
-        message.transcript_type ||
-        message.status ||
-        "";
-
       const role = message.role || "speaker";
+
       const text =
         message.transcript ||
         message.message ||
         message.text ||
         "";
 
-      if (!text) return;
+      if (!text.trim()) return;
 
-      // Ignore partial/streaming transcripts so the UI does not print word-by-word
-      if (
-        transcriptType &&
-        transcriptType.toLowerCase() !== "final" &&
-        transcriptType.toLowerCase() !== "complete"
-      ) {
-        return;
-      }
+      const transcriptType = String(
+        message.transcriptType ||
+        message.transcript_type ||
+        message.status ||
+        ""
+      ).toLowerCase();
+
+      const isFinal =
+        transcriptType === "final" ||
+        transcriptType === "complete" ||
+        message.isFinal === true ||
+        message.final === true;
+
+      // Ignore partial/streaming transcript chunks
+      if (!isFinal) return;
 
       setTranscript((prev) => {
+        const cleanedText = text.trim();
         const last = prev[prev.length - 1];
 
-        // Avoid duplicate final transcript lines
-        if (last && last.role === role && last.text === text) {
+        // Prevent exact duplicate final messages
+        if (last && last.role === role && last.text === cleanedText) {
           return prev;
         }
 
@@ -118,7 +121,7 @@ function App() {
           ...prev,
           {
             role,
-            text,
+            text: cleanedText,
             timestamp: new Date().toLocaleTimeString(),
           },
         ];
