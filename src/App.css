@@ -286,6 +286,7 @@ button:disabled {
 .hero-call-card {
   align-self: center;
   min-width: 0;
+  scroll-margin-top: 24px;
 }
 
 .hero-call-card h2 {

@@ -38,11 +38,11 @@ const roadmapItems = [
 const demoScript =
   "My name is Demo Patient. I have fever and sore throat for three days. The pain is 7 out of 10. I also have mild cough and runny nose. I do not have shortness of breath. I am allergic to nuts. I am not taking any medication.";
 
+const MERGE_WINDOW_MS = 15000;
+
 function App() {
   const vapiRef = useRef(null);
   const transcriptSectionRef = useRef(null);
-  const transcriptEndRef = useRef(null);
-  const transcriptBoxRef = useRef(null);
   const [status, setStatus] = useState("Idle");
   const [isCallActive, setIsCallActive] = useState(false);
   const [transcript, setTranscript] = useState([]);
@@ -78,14 +78,18 @@ function App() {
       setIsCallActive(false);
     };
 
-    const MERGE_WINDOW_MS = 8000;
-
     const handleMessage = (message) => {
       console.log("Vapi message:", message);
 
       if (message?.type !== "transcript") return;
 
-      const role = message.role || "speaker";
+      const rawRole = message.role || "speaker";
+      const role =
+        rawRole === "bot" || rawRole === "assistant"
+          ? "assistant"
+          : rawRole === "user"
+            ? "user"
+            : rawRole;
 
       const text =
         message.transcript ||
@@ -103,25 +107,24 @@ function App() {
         ""
       ).toLowerCase();
 
-      const isFinal =
-        transcriptType === "final" ||
-        transcriptType === "complete" ||
-        message.isFinal === true ||
-        message.final === true;
+      const isClearlyPartial =
+        transcriptType === "partial" ||
+        transcriptType === "interim";
 
-      // Ignore partial/streaming chunks
-      if (!isFinal) return;
+      if (isClearlyPartial) return;
 
       setTranscript((prev) => {
         const now = Date.now();
         const last = prev[prev.length - 1];
 
-        // Merge consecutive messages from the same speaker if they happen close together.
-        // This prevents breathing/short pauses from creating separate bubbles.
+        if (last && last.role === role && last.text === cleanedText) {
+          return prev;
+        }
+
         if (
           last &&
           last.role === role &&
-          now - (last.updatedAt || last.createdAt || now) < MERGE_WINDOW_MS
+          now - (last.updatedAt || last.createdAt || now) <= MERGE_WINDOW_MS
         ) {
           const combinedText = `${last.text} ${cleanedText}`
             .replace(/\s+/g, " ")
@@ -185,14 +188,18 @@ function App() {
     };
   }, [missingConfig]);
 
-  useEffect(() => {
-    if (!transcriptBoxRef.current) return;
+  const scrollToTranscriptOnce = () => {
+    setTimeout(() => {
+      const target =
+        transcriptSectionRef.current ||
+        document.getElementById("live-transcript-section");
 
-    transcriptBoxRef.current.scrollTo({
-      top: transcriptBoxRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [transcript]);
+      target?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 500);
+  };
 
   const startCall = async () => {
     setError("");
@@ -211,14 +218,8 @@ function App() {
 
     try {
       setStatus("Connecting");
-      setTranscript([]);  
-
-      setTimeout(() => {
-        transcriptSectionRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-      }, 300);
+      setTranscript([]);
+      scrollToTranscriptOnce();
 
       await vapiRef.current.start(assistantId);
     } catch (event) {
@@ -282,7 +283,7 @@ function App() {
             {error ? <div className="error-banner">{error}</div> : null}
           </div>
 
-          <div className="transcript-card" ref={transcriptSectionRef}>
+          <div id="live-transcript-section" className="transcript-card hero-call-card" ref={transcriptSectionRef}>
             <p className="eyebrow">Live browser call</p>
             <h2 id="call-panel-title">Clinical intake session</h2>
 
@@ -296,7 +297,7 @@ function App() {
               </div>
             </div>
 
-            <div className="transcript-box" aria-live="polite" ref={transcriptBoxRef}>
+            <div className="transcript-box" aria-live="polite">
               {transcript.length === 0 ? (
                 <p className="empty-transcript">Transcript will appear here during the call.</p>
               ) : (
@@ -310,7 +311,6 @@ function App() {
                   </div>
                 ))
               )}
-              <div ref={transcriptEndRef} />
             </div>
           </div>
         </section>
