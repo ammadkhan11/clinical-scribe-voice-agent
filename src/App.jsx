@@ -77,6 +77,8 @@ function App() {
       setIsCallActive(false);
     };
 
+    const MERGE_WINDOW_MS = 8000;
+
     const handleMessage = (message) => {
       console.log("Vapi message:", message);
 
@@ -90,7 +92,8 @@ function App() {
         message.text ||
         "";
 
-      if (!text.trim()) return;
+      const cleanedText = text.trim();
+      if (!cleanedText) return;
 
       const transcriptType = String(
         message.transcriptType ||
@@ -105,16 +108,33 @@ function App() {
         message.isFinal === true ||
         message.final === true;
 
-      // Ignore partial/streaming transcript chunks
+      // Ignore partial/streaming chunks
       if (!isFinal) return;
 
       setTranscript((prev) => {
-        const cleanedText = text.trim();
+        const now = Date.now();
         const last = prev[prev.length - 1];
 
-        // Prevent exact duplicate final messages
-        if (last && last.role === role && last.text === cleanedText) {
-          return prev;
+        // Merge consecutive messages from the same speaker if they happen close together.
+        // This prevents breathing/short pauses from creating separate bubbles.
+        if (
+          last &&
+          last.role === role &&
+          now - (last.updatedAt || last.createdAt || now) < MERGE_WINDOW_MS
+        ) {
+          const combinedText = `${last.text} ${cleanedText}`
+            .replace(/\s+/g, " ")
+            .trim();
+
+          return [
+            ...prev.slice(0, -1),
+            {
+              ...last,
+              text: combinedText,
+              updatedAt: now,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ];
         }
 
         return [
@@ -122,6 +142,8 @@ function App() {
           {
             role,
             text: cleanedText,
+            createdAt: now,
+            updatedAt: now,
             timestamp: new Date().toLocaleTimeString(),
           },
         ];
