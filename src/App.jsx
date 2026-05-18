@@ -40,6 +40,7 @@ const demoScript =
 
 function App() {
   const vapiRef = useRef(null);
+  const transcriptSectionRef = useRef(null);
   const transcriptEndRef = useRef(null);
   const transcriptBoxRef = useRef(null);
   const [status, setStatus] = useState("Idle");
@@ -210,7 +211,15 @@ function App() {
 
     try {
       setStatus("Connecting");
-      setTranscript([]);
+      setTranscript([]);  
+
+      setTimeout(() => {
+        transcriptSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 300);
+
       await vapiRef.current.start(assistantId);
     } catch (event) {
       const message =
@@ -273,7 +282,7 @@ function App() {
             {error ? <div className="error-banner">{error}</div> : null}
           </div>
 
-          <div className="transcript-card hero-call-card">
+          <div className="transcript-card" ref={transcriptSectionRef}>
             <p className="eyebrow">Live browser call</p>
             <h2 id="call-panel-title">Clinical intake session</h2>
 
