@@ -81,6 +81,41 @@ a:focus-visible {
   white-space: nowrap;
 }
 
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(15, 143, 154, 0.25);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  color: #0b3440;
+  font-weight: 700;
+  padding: 9px 14px;
+  text-decoration: none;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.github-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 143, 154, 0.55);
+  background: #ffffff;
+}
+
+.github-link svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
 main {
   display: grid;
   gap: 28px;
@@ -492,8 +527,16 @@ footer {
     flex-direction: column;
   }
 
+  .navbar-actions {
+    gap: 8px;
+  }
+
   .brand {
     align-items: flex-start;
+  }
+
+  .github-link span {
+    display: none;
   }
 
   .hero-actions {
