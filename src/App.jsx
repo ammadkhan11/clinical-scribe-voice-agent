@@ -45,10 +45,17 @@ function App() {
   const vapiRef = useRef(null);
   const transcriptSectionRef = useRef(null);
   const transcriptBoxRef = useRef(null);
+  const idleWarningTimerRef = useRef(null);
+  const idleFinalWarningTimerRef = useRef(null);
+  const idleEndTimerRef = useRef(null);
+  const callActiveRef = useRef(false);
+  const endedByInactivityRef = useRef(false);
   const [status, setStatus] = useState("Idle");
   const [isCallActive, setIsCallActive] = useState(false);
   const [transcript, setTranscript] = useState([]);
   const [error, setError] = useState("");
+  const [idleNotice, setIdleNotice] = useState("");
+  const [endedByInactivity, setEndedByInactivity] = useState(false);
 
   const missingConfig = useMemo(() => {
     const missing = [];
@@ -56,6 +63,63 @@ function App() {
     if (!assistantId) missing.push("VITE_VAPI_ASSISTANT_ID");
     return missing;
   }, []);
+
+  const clearIdleTimers = () => {
+    if (idleWarningTimerRef.current) {
+      clearTimeout(idleWarningTimerRef.current);
+      idleWarningTimerRef.current = null;
+    }
+
+    if (idleFinalWarningTimerRef.current) {
+      clearTimeout(idleFinalWarningTimerRef.current);
+      idleFinalWarningTimerRef.current = null;
+    }
+
+    if (idleEndTimerRef.current) {
+      clearTimeout(idleEndTimerRef.current);
+      idleEndTimerRef.current = null;
+    }
+  };
+
+  const startIdleTimers = () => {
+    clearIdleTimers();
+
+    idleWarningTimerRef.current = setTimeout(() => {
+      if (!callActiveRef.current) return;
+
+      setIdleNotice("Are you still there? The call will end soon if no response is detected.");
+    }, 12000);
+
+    idleFinalWarningTimerRef.current = setTimeout(() => {
+      if (!callActiveRef.current) return;
+
+      setIdleNotice("No response detected. Ending the call soon to avoid an incomplete session.");
+    }, 25000);
+
+    idleEndTimerRef.current = setTimeout(() => {
+      if (!callActiveRef.current) return;
+
+      endedByInactivityRef.current = true;
+      callActiveRef.current = false;
+      setEndedByInactivity(true);
+      setIdleNotice("Call ended due to inactivity. No clinical note will be saved unless meaningful patient information was provided.");
+      setStatus("Call ended due to inactivity");
+      setIsCallActive(false);
+
+      try {
+        vapiRef.current?.stop?.();
+      } catch (err) {
+        console.error("Failed to stop inactive call:", err);
+      }
+    }, 33000);
+  };
+
+  const resetIdleTimers = () => {
+    if (!callActiveRef.current) return;
+
+    setIdleNotice("");
+    startIdleTimers();
+  };
 
   useEffect(() => {
     if (missingConfig.length > 0) {
@@ -71,13 +135,27 @@ function App() {
 
     const handleCallStart = () => {
       setStatus("Call active");
+      callActiveRef.current = true;
+      endedByInactivityRef.current = false;
       setIsCallActive(true);
       setError("");
+      setIdleNotice("");
+      setEndedByInactivity(false);
+      startIdleTimers();
     };
 
     const handleCallEnd = () => {
-      setStatus("Call ended");
+      clearIdleTimers();
+      callActiveRef.current = false;
       setIsCallActive(false);
+
+      if (endedByInactivityRef.current) {
+        setStatus("Call ended due to inactivity");
+        return;
+      }
+
+      setStatus("Call ended. Clinical note will be processed if enough information was captured.");
+      setIdleNotice("");
     };
 
     const handleMessage = (message) => {
@@ -114,6 +192,8 @@ function App() {
         transcriptType === "interim";
 
       if (isClearlyPartial) return;
+
+      resetIdleTimers();
 
       setTranscript((prev) => {
         const now = Date.now();
@@ -157,14 +237,20 @@ function App() {
     };
 
     const handleError = (event) => {
-      const message =
-        event?.message ||
-        event?.error?.message ||
-        "Something went wrong with the voice call. Check microphone permissions and Vapi configuration.";
+      console.error("Vapi call error:", event);
+
+      clearIdleTimers();
+      callActiveRef.current = false;
+      setIsCallActive(false);
+
+      if (endedByInactivityRef.current) {
+        setStatus("Call ended due to inactivity");
+        return;
+      }
 
       setStatus("Error");
-      setIsCallActive(false);
-      setError(message);
+      setIdleNotice("");
+      setError("The call ended unexpectedly. Please try again.");
     };
 
     vapi.on("call-start", handleCallStart);
@@ -173,6 +259,8 @@ function App() {
     vapi.on("error", handleError);
 
     return () => {
+      clearIdleTimers();
+
       if (typeof vapi.off === "function") {
         vapi.off("call-start", handleCallStart);
         vapi.off("call-end", handleCallEnd);
@@ -216,6 +304,10 @@ function App() {
 
   const startCall = async () => {
     setError("");
+    setIdleNotice("");
+    endedByInactivityRef.current = false;
+    callActiveRef.current = false;
+    setEndedByInactivity(false);
 
     if (missingConfig.length > 0) {
       setStatus("Error");
@@ -230,16 +322,33 @@ function App() {
     }
 
     try {
-      setStatus("Connecting");
+      setStatus("Connecting...");
+      setIsCallActive(false);
       setTranscript([]);
       scrollToTranscriptOnce();
 
       await vapiRef.current.start(assistantId);
+
+      endedByInactivityRef.current = false;
+      callActiveRef.current = true;
+      setIsCallActive(true);
+      setStatus("Call active");
+      setError("");
+      setIdleNotice("");
+      setEndedByInactivity(false);
+      startIdleTimers();
     } catch (event) {
+      if (endedByInactivityRef.current) {
+        setStatus("Call ended due to inactivity");
+        return;
+      }
+
       const message =
         event?.message ||
         "Unable to start the voice call. Allow microphone access and confirm your Vapi public key and assistant ID.";
 
+      clearIdleTimers();
+      callActiveRef.current = false;
       setStatus("Error");
       setIsCallActive(false);
       setError(message);
@@ -250,12 +359,20 @@ function App() {
     if (!vapiRef.current) return;
 
     try {
+      clearIdleTimers();
+      callActiveRef.current = false;
+      endedByInactivityRef.current = false;
       vapiRef.current.stop();
       setStatus("Call ended");
       setIsCallActive(false);
+      setIdleNotice("");
+      setEndedByInactivity(false);
     } catch (event) {
+      clearIdleTimers();
+      callActiveRef.current = false;
       setStatus("Error");
       setIsCallActive(false);
+      setIdleNotice("");
       setError(event?.message || "Unable to end the call. Please refresh the page if the call remains active.");
     }
   };
@@ -321,11 +438,17 @@ function App() {
               <div className={`mic-orb ${isCallActive ? "listening" : ""}`}>
                 <span />
               </div>
-              <div>
-                <p className="state-label">Current call status</p>
-                <strong>{status}</strong>
+      <div>
+        <p className="state-label">Current call status</p>
+        <strong>{status}</strong>
+      </div>
+    </div>
+
+            {idleNotice && (
+              <div className={`idle-notice ${endedByInactivity ? "ended" : ""}`}>
+                {idleNotice}
               </div>
-            </div>
+            )}
 
             <div className="transcript-box" aria-live="polite" ref={transcriptBoxRef}>
               {transcript.length === 0 ? (

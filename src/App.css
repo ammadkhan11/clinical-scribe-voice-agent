@@ -380,6 +380,23 @@ button:disabled {
   font-size: 1.2rem;
 }
 
+.idle-notice {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(180, 120, 20, 0.25);
+  border-radius: 14px;
+  background: #fff8e6;
+  color: #6b4b00;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.idle-notice.ended {
+  border-color: rgba(170, 92, 16, 0.3);
+  background: #fff4dc;
+  color: #6a3f00;
+}
+
 .transcript-box {
   max-height: 300px;
   min-height: 300px;
