@@ -1,0 +1,450 @@
+{
+  "name": "Clinical Scribe Voice Agent - MVP",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clinical-scribe",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -304,
+        48
+      ],
+      "id": "2df3589f-f9e2-4c4f-b233-037fc5b24327",
+      "name": "Receive Vapi Call Report",
+      "webhookId": "bc9868ce-e3c1-4219-b17c-4a4271e6f28d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "52dfa251-8753-4dee-a37f-1b9db31500f0",
+              "leftValue": "={{ $json.body.message?.type || $json.body.type || \"\" }}",
+              "rightValue": "end-of-call-report",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -112,
+        48
+      ],
+      "id": "b5255ffb-7889-4d5a-a08e-5595e10c0bf9",
+      "name": "Check Final Call Report"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const body = item.json.body || {};\n\n  const messages =\n    body.artifact?.messages ||\n    body.messages ||\n    body.message?.artifact?.messages ||\n    [];\n\n  const getMessageText = (m) => {\n    return m.message || m.content || m.text || \"\";\n  };\n\n  const cleanRole = (role) => (role || \"\").toLowerCase();\n\n  const usableMessages = Array.isArray(messages)\n    ? messages.filter(m => {\n        const role = cleanRole(m.role);\n        return role !== \"system\" && role !== \"developer\" && role !== \"tool\";\n      })\n    : [];\n\n  const conversationMessages = usableMessages\n    .map(m => {\n      const role = cleanRole(m.role);\n      const text = getMessageText(m);\n\n      if (!text) return \"\";\n\n      if (role === \"bot\" || role === \"assistant\") {\n        return `Assistant: ${text}`;\n      }\n\n      if (role === \"user\") {\n        return `Patient: ${text}`;\n      }\n\n      return `${role || \"Speaker\"}: ${text}`;\n    })\n    .filter(Boolean)\n    .join(\"\\n\");\n\n  const userOnlyText = usableMessages\n    .filter(m => cleanRole(m.role) === \"user\")\n    .map(m => getMessageText(m))\n    .filter(Boolean)\n    .join(\"\\n\");\n\n  function titleCaseWord(word) {\n    if (!word) return \"\";\n    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();\n  }\n\n  function titleCaseName(name) {\n    return name\n      .trim()\n      .replace(/[.,!?]+$/g, \"\")\n      .split(/\\s+/)\n      .filter(Boolean)\n      .map(titleCaseWord)\n      .join(\" \");\n  }\n\n  function formatJoinedLetters(joined) {\n    if (!joined) return \"\";\n\n    joined = joined.toLowerCase().replace(/[^a-z]/g, \"\");\n\n    // Common demo case: Ammad Khan spelled as a m m a d k h a n\n    if (joined.endsWith(\"khan\") && joined.length > 4) {\n      const firstName = joined.slice(0, -4);\n      return `${titleCaseWord(firstName)} Khan`;\n    }\n\n    return titleCaseWord(joined);\n  }\n\n  function extractSpelledNameFromText(text) {\n    if (!text) return \"\";\n\n    let lower = text.toLowerCase();\n\n    // Only focus on the part after phrases like \"name as ...\"\n    const segmentMatch =\n      lower.match(/name\\s+as\\s+(.+?)(?:is that correct|\\?|$)/i) ||\n      lower.match(/name\\s+is\\s+(.+?)(?:is that correct|\\?|$)/i) ||\n      lower.match(/have your name as\\s+(.+?)(?:is that correct|\\?|$)/i);\n\n    if (segmentMatch && segmentMatch[1]) {\n      lower = segmentMatch[1];\n    }\n\n    // Convert \"d for dog\" to \"d\"\n    lower = lower.replace(/\\b([a-z])\\s+for\\s+[a-z]+\\b/g, \"$1\");\n\n    // Convert \"double m\" to \"m m\"\n    lower = lower.replace(/\\bdouble\\s+([a-z])\\b/g, \"$1 $1\");\n\n    // Convert \"two m\" to \"m m\"\n    lower = lower.replace(/\\btwo\\s+([a-z])\\b/g, \"$1 $1\");\n\n    const letters = lower.match(/\\b[a-z]\\b/g);\n\n    if (!letters || letters.length < 3) {\n      return \"\";\n    }\n\n    const joined = letters.join(\"\");\n\n    // Ignore tiny accidental captures\n    if (joined.length < 3) {\n      return \"\";\n    }\n\n    return formatJoinedLetters(joined);\n  }\n\n  function extractNormalName(text) {\n    if (!text) return \"\";\n\n    const match = text.match(\n      /(?:my name is|i am|i'm|this is|it is|it's)\\s+([a-zA-Z][a-zA-Z\\s'-]{1,60}?)(?:,|\\.|\\s+spelled|\\s+spell|\\s+i have|\\s+and\\s+i|\\s+with|\\n|$)/i\n    );\n\n    if (!match || !match[1]) return \"\";\n\n    let name = match[1].trim();\n\n    name = name\n      .replace(/\\b(have|fever|sore|throat|pain|cough|allergy|allergies|medication|medications|symptoms|no|none)\\b.*$/i, \"\")\n      .trim();\n\n    if (name.length < 2) return \"\";\n\n    return titleCaseName(name);\n  }\n\n  function extractLastConfirmedAssistantName(messages) {\n    let confirmedName = \"\";\n\n    for (let i = 0; i < messages.length - 1; i++) {\n      const current = messages[i];\n      const next = messages[i + 1];\n\n      const currentRole = cleanRole(current.role);\n      const nextRole = cleanRole(next.role);\n\n      if (!(currentRole === \"bot\" || currentRole === \"assistant\")) continue;\n      if (nextRole !== \"user\") continue;\n\n      const assistantText = getMessageText(current);\n      const userReply = getMessageText(next).toLowerCase();\n\n      const userConfirmed =\n        /\\b(yes|yeah|yep|correct|right|that's right|that is right|exactly|perfect|confirmed)\\b/i.test(userReply);\n\n      if (!userConfirmed) continue;\n\n      const spelledName = extractSpelledNameFromText(assistantText);\n      if (spelledName) {\n        confirmedName = spelledName;\n        continue;\n      }\n\n      const normalName =\n        assistantText.match(/name\\s+(?:as|is)\\s+([A-Z][a-zA-Z'-]+(?:\\s+[A-Z][a-zA-Z'-]+){0,3})/i);\n\n      if (normalName && normalName[1]) {\n        confirmedName = titleCaseName(normalName[1]);\n      }\n    }\n\n    return confirmedName;\n  }\n\n  function extractBestUserName(text) {\n    const spelled = extractSpelledNameFromText(text);\n    if (spelled) return spelled;\n\n    const normal = extractNormalName(text);\n    if (normal) return normal;\n\n    return \"\";\n  }\n\n  // Priority:\n  // 1. Last name confirmed by the user\n  // 2. User's own spelling/name\n  // 3. Vapi/customer field fallback\n  const confirmedAssistantName = extractLastConfirmedAssistantName(usableMessages);\n  const userName = extractBestUserName(userOnlyText);\n\n  const extractedPatientName =\n    confirmedAssistantName ||\n    userName ||\n    body.patient_name ||\n    body.patientName ||\n    body.customer?.name ||\n    \"Not mentioned\";\n\n  const callId =\n    body.call?.id ||\n    body.message?.call?.id ||\n    body.callId ||\n    body.id ||\n    \"Not available\";\n\n  // Prefer our cleaned conversation transcript so system prompts are removed\n  const transcript =\n    conversationMessages ||\n    body.artifact?.transcript ||\n    body.message?.artifact?.transcript ||\n    body.transcript ||\n    \"No transcript received\";\n\n  return {\n    json: {\n      call_id: callId,\n      patient_name: extractedPatientName,\n      clinical_transcript: transcript,\n      user_only_text: userOnlyText,\n      name_source: confirmedAssistantName\n        ? \"confirmed_assistant_name\"\n        : userName\n        ? \"user_name_or_spelling\"\n        : \"fallback\"\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        48
+      ],
+      "id": "d1ec983a-997f-4cf1-b066-34643a21bb02",
+      "name": "Extract Call Transcript"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=You are a clinical documentation assistant.\n\nConvert this transcript into structured clinical data and a professional clinical scribe note.\n\nRules:\n- Do not invent facts.\n- If missing, write \"Not mentioned\".\n- Do not diagnose or prescribe anything not stated.\n- Ignore filler words and casual conversation.\n- This is only a draft for clinician review.\n- Return ONLY valid JSON.\n- Do not use markdown.\n- Do not wrap the response in ```json.\n- If the transcript contains a spelled name, use the spelled version as the patient name. For example, if the patient says \"A M M A D\", use \"Ammad\". If the assistant misheard the name but the patient corrected it, use the corrected version.\n\nPatient name source of truth:\nUse this exact patient name if provided:\n{{ $json.patient_name }}\n\nIf this patient name is not \"Not mentioned\", use it exactly.\nDo not replace it with a similar common name.\nDo not use the assistant's recap of the name if it conflicts with the patient's own spelling.\nIf the patient spelled the name, use the spelling as the source of truth.\n\nTranscript:\n{{ $json.clinical_transcript }}\n\nReturn exactly this JSON structure:\n\n{\n  \"patient_name\": \"\",\n  \"chief_complaint\": \"\",\n  \"symptoms\": \"\",\n  \"duration\": \"\",\n  \"severity\": \"\",\n  \"relevant_negatives\": \"\",\n  \"past_medical_history\": \"\",\n  \"medications\": \"\",\n  \"allergies\": \"\",\n  \"assessment\": \"\",\n  \"plan\": \"\",\n  \"clinical_note\": \"\"\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        304,
+        48
+      ],
+      "id": "e9b9fb9c-7b26-4170-a3b8-d8641b7bc394",
+      "name": "Generate Clinical Note",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const openAiOutput = items[0].json;\n\nconst text =\n  openAiOutput.output?.[0]?.content?.[0]?.text ||\n  openAiOutput.text ||\n  openAiOutput.response ||\n  \"\";\n\nconst cleaned = String(text)\n  .replace(/```json/g, \"\")\n  .replace(/```/g, \"\")\n  .trim();\n\nlet aiData;\n\ntry {\n  aiData = JSON.parse(cleaned);\n} catch (error) {\n  aiData = {\n    patient_name: \"Not mentioned\",\n    chief_complaint: \"Not mentioned\",\n    symptoms: \"Not mentioned\",\n    duration: \"Not mentioned\",\n    severity: \"Not mentioned\",\n    relevant_negatives: \"Not mentioned\",\n    past_medical_history: \"Not mentioned\",\n    medications: \"Not mentioned\",\n    allergies: \"Not mentioned\",\n    assessment: \"Not mentioned\",\n    plan: \"Not mentioned\",\n    clinical_note: cleaned || \"No clinical note generated\"\n  };\n}\n\nconst transcriptData = $(\"Extract Call Transcript\").first().json;\n\nreturn [\n  {\n    json: {\n      created_at: new Date().toLocaleString(\"en-PK\", {\n        timeZone: \"Asia/Karachi\"\n      }),\n\n      call_id: transcriptData.call_id || \"Not available\",\n\n      patient_name:\n      transcriptData.patient_name && transcriptData.patient_name !== \"Not mentioned\"\n      ? transcriptData.patient_name\n      : aiData.patient_name || \"Not mentioned\",\n\n      chief_complaint: aiData.chief_complaint || \"Not mentioned\",\n      symptoms: aiData.symptoms || \"Not mentioned\",\n      duration: aiData.duration || \"Not mentioned\",\n      severity: aiData.severity || \"Not mentioned\",\n      relevant_negatives: aiData.relevant_negatives || \"Not mentioned\",\n      past_medical_history: aiData.past_medical_history || \"Not mentioned\",\n      medications: aiData.medications || \"Not mentioned\",\n      allergies: aiData.allergies || \"Not mentioned\",\n      assessment: aiData.assessment || \"Not mentioned\",\n      plan: aiData.plan || \"Not mentioned\",\n\n      full_transcript:\n        transcriptData.clinical_transcript || \"No transcript received\",\n\n      clinical_note: aiData.clinical_note || \"No clinical note generated\",\n      status: \"Draft - clinician review required\"\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        48
+      ],
+      "id": "e39d236f-0171-4a9f-a500-622fa2db3b8e",
+      "name": "Format Patient Record"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1VoGnDG7xw8YRevknx7lOLVZayf61E0-eGMKCVfOeVqw/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "created_at": "={{ $json.created_at }}",
+            "patient_name": "={{ $json.patient_name }}",
+            "chief_complaint": "={{ $json.chief_complaint }}",
+            "symptoms": "={{ $json.symptoms }}",
+            "duration": "={{ $json.duration }}",
+            "severity": "={{ $json.severity }}",
+            "relevant_negatives": "={{ $json.relevant_negatives }}",
+            "past_medical_history": "={{ $json.past_medical_history }}",
+            "medications": "={{ $json.medications }}",
+            "allergies": "={{ $json.allergies }}",
+            "assessment": "={{ $json.assessment }}",
+            "plan": "={{ $json.plan }}",
+            "full_transcript": "={{ $json.full_transcript }}",
+            "clinical_note": "={{ $json.clinical_note }}",
+            "call_id": "={{ $json.call_id }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "call_id",
+              "displayName": "call_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "patient_name",
+              "displayName": "patient_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "chief_complaint",
+              "displayName": "chief_complaint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "symptoms",
+              "displayName": "symptoms",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "duration",
+              "displayName": "duration",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "severity",
+              "displayName": "severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "relevant_negatives",
+              "displayName": "relevant_negatives",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "past_medical_history",
+              "displayName": "past_medical_history",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "medications",
+              "displayName": "medications",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "allergies",
+              "displayName": "allergies",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "full_transcript",
+              "displayName": "full_transcript",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "clinical_note",
+              "displayName": "clinical_note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "assessment",
+              "displayName": "assessment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "plan",
+              "displayName": "plan",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        816,
+        48
+      ],
+      "id": "ed3c8cad-a86e-4b2d-be32-f41cf87f43d7",
+      "name": "Save Record to Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "gMirnPG8YMlnM9m1",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"message\": \"Clinical note saved to Google Sheets\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        992,
+        48
+      ],
+      "id": "c4108756-de7a-499f-a833-56775bda7136",
+      "name": "Return Success Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Ignored non-final Vapi event.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        112,
+        224
+      ],
+      "id": "3e648f0c-bee1-4925-9f59-86248a3e52c1",
+      "name": "Ignore Non-Final Event"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Vapi Call Report": {
+      "main": [
+        [
+          {
+            "node": "Check Final Call Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Final Call Report": {
+      "main": [
+        [
+          {
+            "node": "Extract Call Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignore Non-Final Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Call Transcript": {
+      "main": [
+        [
+          {
+            "node": "Generate Clinical Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Clinical Note": {
+      "main": [
+        [
+          {
+            "node": "Format Patient Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Patient Record": {
+      "main": [
+        [
+          {
+            "node": "Save Record to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Record to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Return Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0079adc9-e8f2-427d-8d29-b4077f2bee49",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3a2e336c597c0fcf2fb0be82dff82653e6bd39af5cae2a7410773b1209310a08"
+  },
+  "id": "4suqOZiLOPAUcMSA",
+  "tags": []
+}
