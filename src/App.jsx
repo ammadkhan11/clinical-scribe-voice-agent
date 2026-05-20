@@ -40,6 +40,18 @@ const demoScript =
   "My name is Demo Patient. I have fever and sore throat for three days. The pain is 7 out of 10. I also have mild cough and runny nose. I do not have shortness of breath. I am allergic to nuts. I am not taking any medication.";
 
 const MERGE_WINDOW_MS = 15000;
+const ASSISTANT_CLOSING_PHRASE = "prepare this as a draft clinical note for clinician review";
+const USER_ENDING_PHRASES = [
+  "bye",
+  "bye bye",
+  "goodbye",
+  "thank you bye",
+  "that's all",
+  "nothing else",
+  "i am done",
+  "end the call",
+  "stop the call",
+];
 
 function App() {
   const vapiRef = useRef(null);
@@ -50,6 +62,9 @@ function App() {
   const idleEndTimerRef = useRef(null);
   const callActiveRef = useRef(false);
   const endedByInactivityRef = useRef(false);
+  const pendingEndCallRef = useRef(false);
+  const intentionalStopRef = useRef(false);
+  const endCallFallbackTimerRef = useRef(null);
   const [status, setStatus] = useState("Idle");
   const [isCallActive, setIsCallActive] = useState(false);
   const [transcript, setTranscript] = useState([]);
@@ -78,6 +93,30 @@ function App() {
     if (idleEndTimerRef.current) {
       clearTimeout(idleEndTimerRef.current);
       idleEndTimerRef.current = null;
+    }
+  };
+
+  const clearEndCallFallbackTimer = () => {
+    if (endCallFallbackTimerRef.current) {
+      clearTimeout(endCallFallbackTimerRef.current);
+      endCallFallbackTimerRef.current = null;
+    }
+  };
+
+  const stopCallIntentionally = (statusText = "Call ended") => {
+    intentionalStopRef.current = true;
+    pendingEndCallRef.current = false;
+    callActiveRef.current = false;
+    clearEndCallFallbackTimer();
+    clearIdleTimers();
+
+    setStatus(statusText);
+    setIsCallActive(false);
+
+    try {
+      vapiRef.current?.stop?.();
+    } catch (err) {
+      console.error("Failed to stop call intentionally:", err);
     }
   };
 
@@ -137,6 +176,9 @@ function App() {
       setStatus("Call active");
       callActiveRef.current = true;
       endedByInactivityRef.current = false;
+      intentionalStopRef.current = false;
+      pendingEndCallRef.current = false;
+      clearEndCallFallbackTimer();
       setIsCallActive(true);
       setError("");
       setIdleNotice("");
@@ -146,8 +188,16 @@ function App() {
 
     const handleCallEnd = () => {
       clearIdleTimers();
+      clearEndCallFallbackTimer();
       callActiveRef.current = false;
+      pendingEndCallRef.current = false;
       setIsCallActive(false);
+
+      if (intentionalStopRef.current) {
+        intentionalStopRef.current = false;
+        setStatus("Call ended");
+        return;
+      }
 
       if (endedByInactivityRef.current) {
         setStatus("Call ended due to inactivity");
@@ -195,6 +245,43 @@ function App() {
 
       resetIdleTimers();
 
+      const normalizedText = cleanedText
+        .toLowerCase()
+        .replace(/[’]/g, "'")
+        .replace(/[^\w\s']/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const normalizedEndText = normalizedText.replace(/that's/g, "that is");
+
+      const userWantsToEnd =
+        role === "user" &&
+        USER_ENDING_PHRASES.some((phrase) => {
+          const normalizedPhrase = phrase.replace(/that's/g, "that is");
+          const phrasePattern = new RegExp(`(^|\\s)${normalizedPhrase.replace(/\s+/g, "\\s+")}(\\s|$)`);
+          return phrasePattern.test(normalizedEndText);
+        });
+
+      if (userWantsToEnd) {
+        pendingEndCallRef.current = true;
+        setIdleNotice("Ending call after assistant closes the session.");
+        clearEndCallFallbackTimer();
+        endCallFallbackTimerRef.current = setTimeout(() => {
+          stopCallIntentionally("Call ended");
+        }, 5000);
+      }
+
+      const assistantClosedSession =
+        role === "assistant" &&
+        pendingEndCallRef.current &&
+        normalizedText.includes(ASSISTANT_CLOSING_PHRASE);
+
+      if (assistantClosedSession) {
+        clearEndCallFallbackTimer();
+        endCallFallbackTimerRef.current = setTimeout(() => {
+          stopCallIntentionally("Call ended");
+        }, 1200);
+      }
+
       setTranscript((prev) => {
         const now = Date.now();
         const last = prev[prev.length - 1];
@@ -240,8 +327,15 @@ function App() {
       console.error("Vapi call error:", event);
 
       clearIdleTimers();
+      clearEndCallFallbackTimer();
       callActiveRef.current = false;
       setIsCallActive(false);
+
+      if (intentionalStopRef.current) {
+        console.error("Vapi error after intentional stop:", event);
+        setStatus("Call ended");
+        return;
+      }
 
       if (endedByInactivityRef.current) {
         setStatus("Call ended due to inactivity");
@@ -260,6 +354,7 @@ function App() {
 
     return () => {
       clearIdleTimers();
+      clearEndCallFallbackTimer();
 
       if (typeof vapi.off === "function") {
         vapi.off("call-start", handleCallStart);
@@ -307,6 +402,9 @@ function App() {
     setIdleNotice("");
     endedByInactivityRef.current = false;
     callActiveRef.current = false;
+    pendingEndCallRef.current = false;
+    intentionalStopRef.current = false;
+    clearEndCallFallbackTimer();
     setEndedByInactivity(false);
 
     if (missingConfig.length > 0) {
@@ -360,8 +458,11 @@ function App() {
 
     try {
       clearIdleTimers();
+      clearEndCallFallbackTimer();
       callActiveRef.current = false;
       endedByInactivityRef.current = false;
+      pendingEndCallRef.current = false;
+      intentionalStopRef.current = false;
       vapiRef.current.stop();
       setStatus("Call ended");
       setIsCallActive(false);
@@ -369,7 +470,9 @@ function App() {
       setEndedByInactivity(false);
     } catch (event) {
       clearIdleTimers();
+      clearEndCallFallbackTimer();
       callActiveRef.current = false;
+      pendingEndCallRef.current = false;
       setStatus("Error");
       setIsCallActive(false);
       setIdleNotice("");
