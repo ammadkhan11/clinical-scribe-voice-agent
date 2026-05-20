@@ -46,6 +46,7 @@ a:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  width: 100%;
   padding: 24px 0;
 }
 
@@ -53,9 +54,14 @@ a:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   color: #12303b;
   font-weight: 800;
   text-decoration: none;
+}
+
+.brand > span:last-child {
+  overflow-wrap: anywhere;
 }
 
 .brand-mark {
@@ -85,19 +91,26 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .github-link {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   border: 1px solid rgba(15, 143, 154, 0.25);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.85);
   color: #0b3440;
   font-weight: 700;
   padding: 9px 14px;
+  position: relative;
+  z-index: 5;
+  opacity: 1;
+  visibility: visible;
   text-decoration: none;
+  white-space: nowrap;
   transition:
     transform 0.2s ease,
     border-color 0.2s ease,
@@ -113,7 +126,7 @@ a:focus-visible {
 .github-link svg {
   width: 18px;
   height: 18px;
-  flex: 0 0 auto;
+  flex-shrink: 0;
 }
 
 main {
@@ -517,6 +530,24 @@ footer {
   }
 }
 
+@media (max-width: 640px) {
+  .navbar {
+    gap: 10px;
+  }
+
+  .navbar-actions {
+    gap: 8px;
+  }
+
+  .github-link {
+    padding: 9px 10px;
+  }
+
+  .github-link span {
+    display: none;
+  }
+}
+
 @media (max-width: 560px) {
   .app-shell {
     width: min(100% - 20px, 1180px);
@@ -527,16 +558,8 @@ footer {
     flex-direction: column;
   }
 
-  .navbar-actions {
-    gap: 8px;
-  }
-
   .brand {
     align-items: flex-start;
-  }
-
-  .github-link span {
-    display: none;
   }
 
   .hero-actions {
