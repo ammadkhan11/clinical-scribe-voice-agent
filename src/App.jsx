@@ -57,7 +57,6 @@ const hasUserEndIntent = (text) => {
     /\bgoodbye\b/.test(normalized) ||
     normalized.includes("bye bye") ||
     normalized.includes("thank you bye") ||
-    normalized === "alright" ||
     normalized.includes("ok goodbye") ||
     normalized.includes("that s all") ||
     normalized.includes("thats all") ||
