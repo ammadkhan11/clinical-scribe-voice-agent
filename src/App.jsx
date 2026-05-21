@@ -40,25 +40,53 @@ const demoScript =
   "My name is Demo Patient. I have fever and sore throat for three days. The pain is 7 out of 10. I also have mild cough and runny nose. I do not have shortness of breath. I am allergic to nuts. I am not taking any medication.";
 
 const MERGE_WINDOW_MS = 15000;
-const ASSISTANT_CLOSING_PHRASE = "prepare this as a draft clinical note for clinician review";
-const USER_ENDING_PHRASES = [
-  "bye",
-  "bye bye",
-  "goodbye",
-  "thank you bye",
-  "that's all",
-  "nothing else",
-  "i am done",
-  "i don't want to continue",
-  "please end the call",
-  "end the call",
-  "stop the call",
-];
-const ASSISTANT_ENDING_PHRASES = [
-  ASSISTANT_CLOSING_PHRASE,
-  "call ended",
-  "goodbye",
-];
+
+const normalizeTranscriptText = (value) => {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const hasUserEndIntent = (text) => {
+  const normalized = normalizeTranscriptText(text);
+
+  return (
+    /\bbye\b/.test(normalized) ||
+    /\bgoodbye\b/.test(normalized) ||
+    normalized.includes("bye bye") ||
+    normalized.includes("thank you bye") ||
+    normalized === "alright" ||
+    normalized.includes("ok goodbye") ||
+    normalized.includes("that s all") ||
+    normalized.includes("thats all") ||
+    normalized.includes("nothing else") ||
+    normalized.includes("i am done") ||
+    normalized.includes("i don t want to continue") ||
+    normalized.includes("i dont want to continue") ||
+    normalized.includes("can you please end this call") ||
+    normalized.includes("please end this call") ||
+    normalized.includes("please end the call") ||
+    normalized.includes("end this call") ||
+    normalized.includes("end the call") ||
+    normalized.includes("stop the call") ||
+    normalized === "stop"
+  );
+};
+
+const hasAssistantClosingPhrase = (text) => {
+  const normalized = normalizeTranscriptText(text);
+
+  return (
+    normalized.includes("thank you i will prepare this as a draft clinical note for clinician review goodbye") ||
+    normalized.includes("prepare this as a draft clinical note") ||
+    normalized.includes("clinician review goodbye") ||
+    normalized.includes("call ended") ||
+    normalized === "goodbye" ||
+    normalized.endsWith("goodbye")
+  );
+};
 
 function App() {
   const vapiRef = useRef(null);
@@ -120,6 +148,7 @@ function App() {
     setStatus(statusText);
     setIsCallActive(false);
     setIdleNotice("");
+    setError("");
 
     try {
       vapiRef.current?.stop?.();
@@ -251,7 +280,9 @@ function App() {
 
       if (isClearlyPartial) return;
 
-      resetIdleTimers();
+      if (!pendingEndCallRef.current && !intentionalStopRef.current) {
+        resetIdleTimers();
+      }
 
       const normalizedText = cleanedText
         .toLowerCase()
@@ -261,33 +292,29 @@ function App() {
         .trim();
       const normalizedEndText = normalizedText.replace(/that's/g, "that is");
 
-      const userWantsToEnd =
-        role === "user" &&
-        USER_ENDING_PHRASES.some((phrase) => {
-          const normalizedPhrase = phrase.replace(/that's/g, "that is");
-          const phrasePattern = new RegExp(`(^|\\s)${normalizedPhrase.replace(/\s+/g, "\\s+")}(\\s|$)`);
-          return phrasePattern.test(normalizedEndText);
-        });
+      const userWantsToEnd = role === "user" && hasUserEndIntent(cleanedText);
 
       if (userWantsToEnd) {
         pendingEndCallRef.current = true;
-        setIdleNotice("Ending call after assistant closes the session.");
+        intentionalStopRef.current = true;
+        setIdleNotice("Ending call...");
+        clearIdleTimers();
         clearEndCallFallbackTimer();
         endCallFallbackTimerRef.current = setTimeout(() => {
           stopCallIntentionally("Call ended");
-        }, 5000);
+        }, 2000);
       }
 
       const assistantClosedSession =
         role === "assistant" &&
         pendingEndCallRef.current &&
-        ASSISTANT_ENDING_PHRASES.some((phrase) => normalizedText.includes(phrase));
+        hasAssistantClosingPhrase(cleanedText);
 
       if (assistantClosedSession) {
         clearEndCallFallbackTimer();
         endCallFallbackTimerRef.current = setTimeout(() => {
           stopCallIntentionally("Call ended");
-        }, 1000);
+        }, 700);
       }
 
       setTranscript((prev) => {
@@ -341,7 +368,10 @@ function App() {
 
       if (intentionalStopRef.current) {
         console.error("Vapi error after intentional stop:", event);
+        pendingEndCallRef.current = false;
+        intentionalStopRef.current = false;
         setStatus("Call ended");
+        setIdleNotice("");
         return;
       }
 
