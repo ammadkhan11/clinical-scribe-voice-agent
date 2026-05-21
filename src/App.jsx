@@ -49,8 +49,15 @@ const USER_ENDING_PHRASES = [
   "that's all",
   "nothing else",
   "i am done",
+  "i don't want to continue",
+  "please end the call",
   "end the call",
   "stop the call",
+];
+const ASSISTANT_ENDING_PHRASES = [
+  ASSISTANT_CLOSING_PHRASE,
+  "call ended",
+  "goodbye",
 ];
 
 function App() {
@@ -112,6 +119,7 @@ function App() {
 
     setStatus(statusText);
     setIsCallActive(false);
+    setIdleNotice("");
 
     try {
       vapiRef.current?.stop?.();
@@ -273,13 +281,13 @@ function App() {
       const assistantClosedSession =
         role === "assistant" &&
         pendingEndCallRef.current &&
-        normalizedText.includes(ASSISTANT_CLOSING_PHRASE);
+        ASSISTANT_ENDING_PHRASES.some((phrase) => normalizedText.includes(phrase));
 
       if (assistantClosedSession) {
         clearEndCallFallbackTimer();
         endCallFallbackTimerRef.current = setTimeout(() => {
           stopCallIntentionally("Call ended");
-        }, 1200);
+        }, 1000);
       }
 
       setTranscript((prev) => {
