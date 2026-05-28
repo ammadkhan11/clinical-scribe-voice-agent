@@ -1,99 +1,306 @@
 # AI Voice Clinical Scribe
 
-AI Voice Clinical Scribe is a Phase 1 MVP web demo for voice-based patient intake. The browser starts a Vapi assistant call, displays call status, and shows transcript events when Vapi provides them. After the call, the existing backend workflow handles clinical note generation and storage.
+A browser-based AI clinical intake assistant that conducts voice-based patient intake conversations, generates structured draft clinical notes, and stores intake records automatically for clinician review.
+
+This project demonstrates a lightweight healthcare voice workflow using Vapi, OpenAI, n8n, Google Sheets, React, and Vercel.
+
+---
 
 ## Overview
 
-This app is intentionally small and demo-focused. It does not include authentication, a database, SaaS account management, or direct frontend access to OpenAI, n8n, Google Sheets, or private credentials.
+The system simulates an initial patient intake workflow commonly performed before clinician evaluation.
 
-## Architecture
+The assistant:
 
-1. Patient speaks to the Vapi assistant from the browser.
-2. Vapi sends the completed call transcript to n8n through the configured webhook.
-3. n8n extracts the transcript and sends it to OpenAI.
-4. OpenAI generates a structured draft clinical note.
-5. Google Sheets stores one row per patient or call.
-6. A licensed clinician reviews and approves the AI-generated draft.
+* conducts a real-time voice conversation,
+* collects structured intake information,
+* generates a draft clinical note,
+* classifies complete vs incomplete calls,
+* and stores structured records automatically.
+
+The generated output is intended for clinician review only.
+
+---
+
+## Features
+
+* Real-time browser-based voice intake
+* AI-guided patient questioning
+* Automatic transcript capture
+* Structured clinical note generation
+* Emergency symptom escalation handling
+* Complete vs incomplete intake routing
+* Google Sheets record storage
+* Responsive React frontend
+* Vercel deployment
+* n8n workflow automation
+* Vapi voice assistant integration
+
+---
 
 ## Tech Stack
 
-- React
-- Vite
-- JavaScript
-- Plain CSS
-- `@vapi-ai/web`
+### Frontend
 
-## Setup
+* React
+* Vite
+* CSS
 
-Install dependencies:
+### Voice & AI
+
+* Vapi
+* OpenAI GPT models
+
+### Automation & Backend
+
+* n8n
+* Webhooks
+
+### Storage
+
+* Google Sheets
+
+### Deployment
+
+* Vercel
+
+---
+
+## System Architecture
+
+```text
+Patient
+   ↓
+Browser Voice Interface
+   ↓
+Vapi Voice Assistant
+   ↓
+n8n Webhook Workflow
+   ↓
+Transcript Extraction
+   ↓
+Clinical Note Generation (OpenAI)
+   ↓
+Structured Record Formatting
+   ↓
+Complete / Incomplete Intake Routing
+   ↓
+Google Sheets Storage
+```
+
+---
+
+## Workflow
+
+### 1. Voice Intake
+
+The patient starts a browser-based voice session and speaks naturally with the intake assistant.
+
+### 2. Transcript Processing
+
+The conversation transcript is sent to the n8n workflow after the call ends.
+
+### 3. Information Extraction
+
+The workflow extracts:
+
+* patient name
+* age
+* chief complaint
+* symptoms
+* severity
+* medications
+* allergies
+* relevant negatives
+* past medical history
+
+### 4. Draft Note Generation
+
+OpenAI generates a structured draft clinical note from the intake transcript.
+
+### 5. Record Classification
+
+The workflow determines whether the intake contains sufficient clinical information.
+
+* Complete intakes → Main sheet
+* Incomplete / interrupted calls → Incomplete Calls sheet
+
+### 6. Record Storage
+
+Structured intake data is stored automatically in Google Sheets.
+
+---
+
+## Frontend
+
+The frontend provides:
+
+* browser-based voice calling,
+* real-time transcript display,
+* call status indicators,
+* inactivity handling,
+* and responsive mobile/desktop support.
+
+The frontend is intentionally lightweight to focus on workflow demonstration and system integration.
+
+---
+
+## n8n Workflow
+
+The workflow handles:
+
+* Vapi webhook reception
+* transcript extraction
+* patient information parsing
+* clinical note generation
+* intake completeness checks
+* Google Sheets storage
+* incomplete call routing
+
+Main workflow stages:
+
+```text
+Receive Vapi Call
+→ Validate Final Call
+→ Extract Transcript
+→ Generate Clinical Note
+→ Format Patient Record
+→ Check Intake Completeness
+→ Store Record
+```
+
+---
+
+## Voice Assistant Behavior
+
+The assistant:
+
+* asks one question at a time,
+* avoids repeating answered questions,
+* handles emergency escalation phrases,
+* supports name spelling confirmation,
+* detects end-call intent,
+* and manages inactivity timeouts.
+
+The assistant does not:
+
+* diagnose,
+* prescribe medication,
+* provide treatment,
+* or replace clinician judgment.
+
+---
+
+## Environment Variables
+
+### Frontend (.env)
+
+```env
+VITE_VAPI_PUBLIC_KEY=your_public_key
+VITE_VAPI_ASSISTANT_ID=your_assistant_id
+```
+
+### n8n / OpenAI
+
+```env
+OPENAI_API_KEY=your_openai_api_key
+```
+
+---
+
+## Local Development
+
+### Clone Repository
+
+```bash
+git clone https://github.com/ammadkhan11/clinical-scribe-voice-agent.git
+cd clinical-scribe-voice-agent
+```
+
+### Install Dependencies
 
 ```bash
 npm install
 ```
 
-Create a local `.env` file from `.env.example`:
-
-```bash
-VITE_VAPI_PUBLIC_KEY=your_vapi_public_key_here
-VITE_VAPI_ASSISTANT_ID=your_vapi_assistant_id_here
-```
-
-Do not commit a real `.env` file.
-
-## Environment Variables
-
-| Variable | Purpose |
-| --- | --- |
-| `VITE_VAPI_PUBLIC_KEY` | Public browser key for Vapi web calls |
-| `VITE_VAPI_ASSISTANT_ID` | Vapi assistant ID used to start the clinical intake call |
-
-## Run Locally
+### Run Development Server
 
 ```bash
 npm run dev
 ```
 
-Open the local Vite URL shown in the terminal.
+---
 
-## Deploy to Vercel
+## Deployment
 
-1. Push the project to GitHub.
-2. Import the repository into Vercel.
-3. Add these environment variables in Vercel project settings:
-   - `VITE_VAPI_PUBLIC_KEY`
-   - `VITE_VAPI_ASSISTANT_ID`
-4. Deploy.
+Frontend deployment is handled using Vercel.
+
+Typical deployment flow:
+
+1. Push changes to GitHub
+2. Connect repository to Vercel
+3. Configure environment variables
+4. Deploy production build
+
+---
+
+## Example Intake Flow
+
+```text
+Patient:
+“I have fever and sore throat for two days. Pain is 7 out of 10.”
+
+Assistant:
+“How severe are the symptoms on a scale of 0 to 10?”
+
+Patient:
+“7.”
+
+Assistant:
+“Are you currently taking any medications?”
+```
+
+---
 
 ## Safety Disclaimer
 
-This system does not diagnose, prescribe, or replace a licensed clinician. All generated notes are AI-generated drafts and must be reviewed and approved by a licensed healthcare professional.
+This project is a technical demonstration and workflow prototype.
 
-## Demo Flow
+The system:
 
-1. Open the app.
-2. Confirm the status shows `Idle`.
-3. Click `Start Clinical Intake`.
-4. Allow microphone permissions in the browser.
-5. Read this demo script:
+* does not provide medical advice,
+* does not diagnose conditions,
+* does not prescribe treatment,
+* and does not replace licensed clinicians.
 
-```text
-My name is Demo Patient. I have fever and sore throat for three days. The pain is 7 out of 10. I also have mild cough and runny nose. I do not have shortness of breath. I am allergic to nuts. I am not taking any medication.
-```
+All generated outputs are draft clinical notes intended for clinician review only.
 
-6. Click `End Call`.
-7. Confirm the downstream n8n workflow receives the transcript and stores the generated draft note in Google Sheets.
+---
 
-## Security Notes
+## Current Scope
 
-- The frontend only uses the Vapi public key.
-- OpenAI keys, n8n credentials, and Google credentials are not stored in the frontend.
-- Clinical note generation and storage happen through n8n after the Vapi call ends.
-- Private keys and service credentials should remain in backend tools and deployment secrets only.
+Phase 1 focuses on:
 
-## Phase 2 Roadmap
+* voice intake workflow,
+* transcript processing,
+* structured note generation,
+* and automated intake routing.
 
-- User signup and organizations
-- Custom scribe creation
-- Client-specific intake fields
-- Phone number and website integration
-- Dashboard for transcripts and notes
+Future phases may include:
+
+* EHR integration
+* authentication
+* secure database storage
+* clinician dashboards
+* analytics
+* multilingual support
+* HIPAA-oriented infrastructure
+* appointment scheduling
+
+---
+
+## Repository
+
+GitHub Repository:
+
+https://github.com/ammadkhan11/clinical-scribe-voice-agent
