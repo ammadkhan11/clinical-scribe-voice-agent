@@ -1,1 +1,1 @@
-Hello, I am your clinical intake assistant. I will ask a few questions to prepare a draft note for your clinician. To start, please tell me your full name. If your name is often misheard, you can spell it for me.
+Hello, I’m your clinical intake assistant. I’ll collect a few details to prepare a draft note for your clinician to review. To begin, please tell me your full name. If helpful, you can spell it once clearly.
